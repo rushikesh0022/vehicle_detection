@@ -98,6 +98,28 @@ All three are handled automatically by `cpp/run_openvino_daemon.sh`.
 
 ---
 
+## 6. Full resource report in the benchmark + `stop_openvino.sh`
+
+**Touched:** `services/config_api/bench_capture.py`, `tools/bench/cascade_bench.py`,
+`ui/src/pages/Bench.tsx`, `ui/src/lib/api.ts`. **New:** `stop_openvino.sh`.
+
+Each capture now samples system resources **over the same window** as the fps deltas, all from
+real sources (not estimated):
+- **CPU / RAM** — `psutil` (system-wide % + the daemon process's CPU%, RSS, threads).
+- **iGPU** — `intel_gpu_top -J`, averaged: the **Compute** engine (where OpenVINO inference runs —
+  reading only `Render/3D` badly under-reports it), the decode (Video) engine, frequency, watts.
+- **NPU** — the `/sys .../npu_busy_time_us` cumulative counter → exact busy %, plus mem + freq.
+
+Shown in the CLI table, the `GET/POST /api/bench` JSON (`resources` block), and a util-bar panel on
+`/bench`. **Key finding this surfaced:** at 15 cams the OpenVINO-only pipeline saturates **both** the
+iGPU Compute engine (~90%, vehicle) **and** the NPU (~98%, plate+OCR) — CPU ~40%, ~8.8 GB RAM. Both
+accelerators are the binding constraint.
+
+`stop_openvino.sh` mirrors `stop.sh` but names the `run_openvino_daemon.sh` supervisor +
+`traffic_pilotd_openvino` explicitly — the safe counterpart to `start_openvino.sh`.
+
+---
+
 ## Benchmark result (15× `number_plate.mp4`)
 
 | Backend | Vehicle engine | Plate/OCR | Decode fps | Vehicle fps (agg) | fps/cam |
